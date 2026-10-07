@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.local
+*.pem
+*.key
+secrets/
+.DS_Store
+coverage/
+*.log
+.idea/
+.vscode/
+
+# Tomsoft API PDF is proprietary — keep local only; not for public redistribution
+docs/*.pdf

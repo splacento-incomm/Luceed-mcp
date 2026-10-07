@@ -1,0 +1,16 @@
+services:
+  luceed-mcp:
+    build: .
+    image: luceed-mcp:latest
+    ports:
+      - "${MCP_HTTP_PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_HTTP_HOST: 0.0.0.0
+      MCP_HTTP_PORT: 8080
+    # Uncomment when SSH_ENABLED=true:
+    # volumes:
+    #   - ./secrets/id_rsa:/run/secrets/ssh_key:ro
+    restart: unless-stopped
