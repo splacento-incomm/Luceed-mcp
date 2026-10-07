@@ -6,7 +6,26 @@ Connect **Claude**, **ChatGPT**, **Cursor**, or any MCP client and ask things li
 
 **Coverage:** 39 resources / **149 GET actions** from Luceed Web Services 2.206. Write APIs (`*/snimi`, status mutations, etc.) are intentionally excluded.
 
-> Luceed is a product of Tomsoft d.o.o. This project is an independent open-source MCP adapter. Official API docs are available from Tomsoft to licensed customers.
+## Built by Debug Labs
+
+Maintained by **[Debug Labs d.o.o.](https://debug-labs.hr)** — a Croatia-based software company specializing in **Luceed ERP integrations**, Magento / e‑commerce sync, and custom B2B automation around Tomsoft Luceed.
+
+If you need help wiring Luceed to your webshop, marketplace, BI tools, or AI assistants (this MCP included), get in touch:
+
+- Website: [https://debug-labs.hr](https://debug-labs.hr)
+- GitHub: [splacento-incomm/Luceed-mcp](https://github.com/splacento-incomm/Luceed-mcp)
+
+> This open-source MCP adapter is independent of Tomsoft. Luceed® is a product of Tomsoft d.o.o.
+
+## Official Luceed API docs
+
+Luceed exposes a RESTful JSON API with **HTTP Basic** authentication. Access is granted per customer — contact the Luceed instance owner for credentials and allowed methods.
+
+- Documentation hub: **[Luceed API | Tomsoft Docs](https://docs.tomsoft.hr/luceedapi/luceed-api)**
+- Spec PDFs (HR / EN, v2.206) are linked from that page  
+  ([pagination](https://docs.tomsoft.hr/luceedapi/luceed-api/dohvat-podataka-s-paginacijom), [changed-data only](https://docs.tomsoft.hr/luceedapi/luceed-api/dohvat-samo-izmijenjenih-podataka))
+
+This MCP maps the documented GET surface into discoverable tools (`luceed_catalog`). Official field-level docs stay with Tomsoft and are not redistributed here.
 
 ## Architecture
 
@@ -14,7 +33,7 @@ Connect **Claude**, **ChatGPT**, **Cursor**, or any MCP client and ask things li
 Claude / ChatGPT / Cursor
         │  MCP (stdio or Streamable HTTP)
         ▼
-   luceed-mcp  (Node.js)
+   luceed-mcp  (Node.js) — Debug Labs
         │  optional SSH -L tunnel (IP whitelist)
         ▼
    Luceed datasnap/rest  (HTTP Basic, GET only)
@@ -128,8 +147,14 @@ See [.env.example](.env.example) and [docs/SETUP.md](docs/SETUP.md).
 
 Luceed itself is HTTP Basic REST — language-agnostic. MCP’s official SDK and Streamable HTTP transport (what Claude/ChatGPT remote connectors expect) are mature in **TypeScript/Node**. A PHP app on the same host (e.g. Sendy) can coexist; run this MCP as a **Docker** service and reverse-proxy an unguessable URL to it.
 
+## Need a Luceed integration?
+
+Debug Labs builds production Luceed connectors for e‑commerce, logistics, and reporting — Magento product/stock/order sync, B2B portals, and AI tooling like this MCP.
+
+**[debug-labs.hr](https://debug-labs.hr)** · open an issue on this repo for MCP-specific questions.
+
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) — © Debug Labs d.o.o. / contributors
 
-Luceed® / Tomsoft® names are trademarks of their respective owners. Official web-service documentation remains Tomsoft’s intellectual property and is **not** redistributed in this repository.
+Luceed® / Tomsoft® names are trademarks of their respective owners. Official web-service documentation remains Tomsoft’s intellectual property and is **not** redistributed in this repository. See [docs.tomsoft.hr/luceedapi](https://docs.tomsoft.hr/luceedapi/luceed-api).
