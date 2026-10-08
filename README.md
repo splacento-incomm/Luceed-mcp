@@ -143,10 +143,6 @@ Example — `luceed_nalozi_prodaje`:
 
 See [.env.example](.env.example) and [docs/SETUP.md](docs/SETUP.md).
 
-## Why Node (not PHP)?
-
-Luceed itself is HTTP Basic REST — language-agnostic. MCP’s official SDK and Streamable HTTP transport (what Claude/ChatGPT remote connectors expect) are mature in **TypeScript/Node**. A PHP app on the same host (e.g. Sendy) can coexist; run this MCP as a **Docker** service and reverse-proxy an unguessable URL to it.
-
 ## Need a Luceed integration?
 
 Debug Labs builds production Luceed connectors for e‑commerce, logistics, and reporting — Magento product/stock/order sync, B2B portals, and AI tooling like this MCP.
