@@ -85,6 +85,8 @@ class FileClientsStore implements OAuthRegisteredClientsStore {
 }
 
 export interface OAuthOptions {
+  /** Exact issuer string from AS metadata (must match `iss` on redirects). */
+  issuer: string;
   password: string;
   signingSecret: string;
   stateFile: string;
@@ -123,7 +125,7 @@ export class LuceedOAuthProvider implements OAuthServerProvider {
     return {
       access_token: this.sign({ k: "access", cid: clientId, sc: scopes, res: resource, exp: now + ACCESS_TTL_S, n: nonce() }),
       refresh_token: this.sign({ k: "refresh", cid: clientId, sc: scopes, res: resource, exp: now + REFRESH_TTL_S, n: nonce() }),
-      token_type: "bearer",
+      token_type: "Bearer",
       expires_in: ACCESS_TTL_S,
       scope: scopes.join(" ") || undefined,
     };
@@ -216,9 +218,13 @@ export class LuceedOAuthProvider implements OAuthServerProvider {
         resource: params.resource?.href,
         expiresAt: Date.now() + CODE_TTL_MS,
       });
+      // ChatGPT/Codex require RFC 9207 `iss` (exact match to metadata issuer)
+      // before they exchange the code — without it they show "Invalid oauth data".
       const target = new URL(params.redirectUri);
       target.searchParams.set("code", code);
+      target.searchParams.set("iss", this.opts.issuer);
       if (params.state) target.searchParams.set("state", params.state);
+      console.error(`oauth: redirect client=${pending.clientId} iss=${this.opts.issuer}`);
       res.redirect(302, target.href);
     });
     return router;

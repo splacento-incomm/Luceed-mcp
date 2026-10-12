@@ -2,6 +2,7 @@ import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
 import {
+  createOAuthMetadata,
   getOAuthProtectedResourceMetadataUrl,
   mcpAuthRouter,
 } from "@modelcontextprotocol/sdk/server/auth/router.js";
@@ -12,14 +13,41 @@ import { createServer } from "./server.js";
 
 function oauthMiddleware(app: Express, config: AppConfig, mcpPath: string): RequestHandler {
   const oauth = config.oauth!;
+  const issuerUrl = new URL(oauth.publicUrl);
+  // Exact string ChatGPT compares for RFC 9207 (no slash normalization).
+  const issuer = issuerUrl.href;
+  const resourceUrl = new URL(`${oauth.publicUrl}${mcpPath}`);
   const provider = new LuceedOAuthProvider({
+    issuer,
     password: oauth.password,
     signingSecret: oauth.signingSecret,
     stateFile: oauth.stateFile,
     staticToken: config.http.authToken,
   });
-  const issuerUrl = new URL(oauth.publicUrl);
-  const resourceUrl = new URL(`${oauth.publicUrl}${mcpPath}`);
+
+  const asMetadata = {
+    ...createOAuthMetadata({
+      provider,
+      issuerUrl,
+      scopesSupported: undefined,
+    }),
+    // Required for ChatGPT stable callback + iss validation (RFC 9207).
+    authorization_response_iss_parameter_supported: true,
+  };
+
+  // Register before mcpAuthRouter so these win over the SDK defaults.
+  const sendAsMetadata = (_req: Request, res: Response): void => {
+    res.json(asMetadata);
+  };
+  app.get("/.well-known/oauth-authorization-server", sendAsMetadata);
+  app.get("/.well-known/openid-configuration", sendAsMetadata);
+  app.get("/.well-known/oauth-protected-resource", (_req, res) => {
+    res.json({
+      resource: resourceUrl.href,
+      authorization_servers: [issuer],
+      resource_name: "Luceed MCP",
+    });
+  });
 
   app.use(
     mcpAuthRouter({
@@ -30,13 +58,6 @@ function oauthMiddleware(app: Express, config: AppConfig, mcpPath: string): Requ
       clientRegistrationOptions: { clientSecretExpirySeconds: 0 },
     }),
   );
-  app.get("/.well-known/oauth-protected-resource", (_req, res) => {
-    res.json({
-      resource: resourceUrl.href,
-      authorization_servers: [issuerUrl.href],
-      resource_name: "Luceed MCP",
-    });
-  });
   app.use(LOGIN_PATH, provider.loginRouter());
 
   const bearer = requireBearerAuth({
