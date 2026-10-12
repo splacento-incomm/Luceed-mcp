@@ -1,16 +1,18 @@
 services:
   luceed-mcp:
+    # Prefer published image; fall back to local build.
+    image: ${LUCEED_MCP_IMAGE:-ghcr.io/splacento-incomm/luceed-mcp:latest}
     build: .
-    image: luceed-mcp:latest
+    # Bind loopback only — put Apache/nginx TLS in front for the public URL.
     ports:
-      - "${MCP_HTTP_PORT:-8080}:8080"
+      - "127.0.0.1:${MCP_HTTP_PORT:-8080}:8080"
     env_file:
       - .env
     environment:
       MCP_TRANSPORT: http
       MCP_HTTP_HOST: 0.0.0.0
-      MCP_HTTP_PORT: 8080
-    # Uncomment when SSH_ENABLED=true:
-    # volumes:
-    #   - ./secrets/id_rsa:/run/secrets/ssh_key:ro
+      MCP_HTTP_PORT: "8080"
+    volumes:
+      # Optional SSH key for Luceed IP whitelist tunnel (see SSH_* in .env)
+      - ./secrets:/run/secrets:ro
     restart: unless-stopped

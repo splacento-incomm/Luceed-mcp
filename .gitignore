@@ -4,7 +4,8 @@ dist/
 .env.local
 *.pem
 *.key
-secrets/
+secrets/*
+!secrets/.gitkeep
 .DS_Store
 coverage/
 *.log

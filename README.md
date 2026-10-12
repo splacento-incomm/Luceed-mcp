@@ -14,6 +14,7 @@ If you need help wiring Luceed to your webshop, marketplace, BI tools, or AI ass
 
 - Website: [https://debug-labs.hr](https://debug-labs.hr)
 - GitHub: [splacento-incomm/Luceed-mcp](https://github.com/splacento-incomm/Luceed-mcp)
+- Container: [`ghcr.io/splacento-incomm/luceed-mcp`](https://github.com/splacento-incomm/Luceed-mcp/pkgs/container/luceed-mcp)
 
 > This open-source MCP adapter is independent of Tomsoft. Luceed® is a product of Tomsoft d.o.o.
 
@@ -22,8 +23,7 @@ If you need help wiring Luceed to your webshop, marketplace, BI tools, or AI ass
 Luceed exposes a RESTful JSON API with **HTTP Basic** authentication. Access is granted per customer — contact the Luceed instance owner for credentials and allowed methods.
 
 - Documentation hub: **[Luceed API | Tomsoft Docs](https://docs.tomsoft.hr/luceedapi/luceed-api)**
-- Spec PDFs (HR / EN, v2.206) are linked from that page  
-  ([pagination](https://docs.tomsoft.hr/luceedapi/luceed-api/dohvat-podataka-s-paginacijom), [changed-data only](https://docs.tomsoft.hr/luceedapi/luceed-api/dohvat-samo-izmijenjenih-podataka))
+- Spec PDFs (HR / EN, v2.206) are linked from that page
 
 This MCP maps the documented GET surface into discoverable tools (`luceed_catalog`). Official field-level docs stay with Tomsoft and are not redistributed here.
 
@@ -31,19 +31,55 @@ This MCP maps the documented GET surface into discoverable tools (`luceed_catalo
 
 ```
 Claude / ChatGPT / Cursor
-        │  MCP (stdio or Streamable HTTP)
+        │  MCP (Streamable HTTP or stdio)
         ▼
-   luceed-mcp  (Node.js) — Debug Labs
-        │  optional SSH -L tunnel (IP whitelist)
+   Docker (user: luceed-mcp)  ← .env in ~/Luceed-mcp
+        │  127.0.0.1:8080 + optional SSH tunnel
         ▼
    Luceed datasnap/rest  (HTTP Basic, GET only)
 ```
 
-## Requirements
+## Docker image (GHCR)
 
-- Node.js **20+**
-- Luceed API user (prefer **read-only**) + base URL
-- Optional: SSH bastion if Luceed whitelists a single IP
+Every push to `main` publishes:
+
+```text
+ghcr.io/splacento-incomm/luceed-mcp:latest
+```
+
+```bash
+docker pull ghcr.io/splacento-incomm/luceed-mcp:latest
+```
+
+## Production deploy (dedicated user)
+
+**Do not run as root.** Use a dedicated OS user with a home directory; keep `.env` only there; bind Docker to localhost; reverse-proxy an unguessable path over TLS.
+
+Full steps: **[docs/DEPLOY.md](docs/DEPLOY.md)**
+
+Short version (as root once):
+
+```bash
+adduser --disabled-password --gecos "Luceed MCP" luceed-mcp
+# install Docker, then:
+usermod -aG docker luceed-mcp
+
+sudo -u luceed-mcp -H bash -lc '
+  cd ~ && git clone https://github.com/splacento-incomm/Luceed-mcp.git
+  cd Luceed-mcp && mkdir -p secrets && chmod 700 secrets
+  cp .env.example .env && chmod 600 .env
+  # edit .env — LUCEED_*, MCP_HTTP_PATH, MCP_AUTH_TOKEN
+  docker compose pull || docker compose build
+  docker compose up -d
+'
+```
+
+Compose reads `/home/luceed-mcp/Luceed-mcp/.env` and listens on **`127.0.0.1:8080` only**.
+
+Point Claude / ChatGPT at:
+
+`https://your-domain/mcp-<secret-from-env>`  
+`Authorization: Bearer <MCP_AUTH_TOKEN>`
 
 ## Quick start (local / stdio)
 
@@ -51,8 +87,7 @@ Claude / ChatGPT / Cursor
 git clone https://github.com/splacento-incomm/Luceed-mcp.git
 cd Luceed-mcp
 cp .env.example .env   # set LUCEED_* credentials
-npm install
-npm run build
+npm install && npm run build
 npm run start:stdio
 ```
 
@@ -75,31 +110,6 @@ npm run start:stdio
 }
 ```
 
-## Remote deploy (Docker) — Claude + ChatGPT
-
-Use **HTTP** transport behind a reverse proxy. Put the MCP on an **unguessable path** and require `MCP_AUTH_TOKEN`.
-
-```bash
-git clone https://github.com/splacento-incomm/Luceed-mcp.git
-cd Luceed-mcp
-cp .env.example .env
-# MCP_TRANSPORT=http
-# MCP_HTTP_PATH=/mcp-<long-random-token>
-# MCP_AUTH_TOKEN=<another-long-secret>
-# LUCEED_* (+ SSH_* if needed)
-
-docker compose up --build -d
-curl -s http://127.0.0.1:8080/healthz
-```
-
-Point Claude / ChatGPT custom MCP connectors at:
-
-`https://your-domain.example/mcp-<long-random-token>`
-
-with header `Authorization: Bearer <MCP_AUTH_TOKEN>`.
-
-Full server notes: [docs/SETUP.md](docs/SETUP.md).
-
 ## Tools
 
 | Tool | Role |
@@ -117,31 +127,19 @@ Ask the model to call `luceed_catalog` first.
 
 `artikli`, `artikli_popusti`, `bundle`, `skladista`, `stanje_zalihe`, `stanje_zalihe_dobavljaci`, `stanje_zalihe_serijski`, `cijene`, `cjenik`, `cjenik_partner`, `akcije`, `prodajne_akcije`, `prodajni_uvjeti`, `partneri`, `users`, `mjesta`, `vrste_placanja`, `grupe_artikala`, `robne_marke`, `sifrarnici`, `statusi`, `prijevodi`, `varijante`, `bodovi`, `tecajna_lista`, `crm_razlozi`, `predmeti`, `mpracuni`, `mpobracun`, `nalozi_prodaje`, `vpracuni`, `racuni_predujma`, `narudzbe`, `nalozi_povrata`, `nalozi_proizvodnje`, `radni_nalozi`, `skladisni_dokumenti`, `hotel`, `poklon_bonovi`
 
-Example — `luceed_nalozi_prodaje`:
-
-```json
-{
-  "action": "statusi",
-  "statusi": "01,02",
-  "od_datuma": "2024-01-01",
-  "do_datuma": "2024-01-31"
-}
-```
-
-→ `NaloziProdaje/statusi/[01,02]/1.1.2024/31.1.2024`
-
 ## Config
 
 | Variable | Required | Notes |
 |----------|----------|--------|
 | `LUCEED_BASE_URL` | yes | Must include `/datasnap/rest/` |
 | `LUCEED_USERNAME` / `LUCEED_PASSWORD` | yes | HTTP Basic |
-| `MCP_TRANSPORT` | | `stdio` (default) or `http` |
+| `MCP_TRANSPORT` | | `stdio` or `http` |
 | `MCP_AUTH_TOKEN` | for HTTP | Bearer / `X-API-Key` |
-| `MCP_HTTP_PATH` | | e.g. `/mcp-a8f3…` unguessable path |
-| `SSH_ENABLED` | | Open local forward for IP-whitelisted Luceed |
+| `MCP_HTTP_PATH` | | Unguessable path e.g. `/mcp-a8f3…` |
+| `LUCEED_MCP_IMAGE` | | Override GHCR image tag |
+| `SSH_ENABLED` | | Local forward for IP-whitelisted Luceed |
 
-See [.env.example](.env.example) and [docs/SETUP.md](docs/SETUP.md).
+See [.env.example](.env.example), [docs/SETUP.md](docs/SETUP.md), [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Need a Luceed integration?
 
