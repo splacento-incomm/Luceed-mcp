@@ -48,7 +48,14 @@ export interface AppConfig {
     path: string;
     authToken: string | null;
     allowedHosts: string[] | undefined;
+    trustProxy: number;
   };
+  oauth: {
+    publicUrl: string;
+    password: string;
+    signingSecret: string;
+    stateFile: string;
+  } | null;
   ssh: {
     enabled: boolean;
     host: string;
@@ -69,6 +76,25 @@ function normalizeBaseUrl(url: string): string {
   const trimmed = url.replace(/\/+$/, "");
   // Accept either .../datasnap/rest or full host; ensure trailing slash for path join.
   return `${trimmed}/`;
+}
+
+function loadOAuthConfig(): AppConfig["oauth"] {
+  const publicUrl = optional("MCP_PUBLIC_URL").replace(/\/+$/, "");
+  if (!publicUrl) return null;
+  const password = optional("MCP_OAUTH_PASSWORD");
+  if (!password) {
+    throw new Error("MCP_PUBLIC_URL enables OAuth and requires MCP_OAUTH_PASSWORD");
+  }
+  const signingSecret = optional("MCP_OAUTH_SECRET");
+  if (signingSecret.length < 32) {
+    throw new Error("MCP_OAUTH_SECRET must be at least 32 characters");
+  }
+  return {
+    publicUrl,
+    password,
+    signingSecret,
+    stateFile: optional("MCP_OAUTH_STATE_FILE", "./data/oauth-clients.json"),
+  };
 }
 
 export function loadConfig(): AppConfig {
@@ -113,7 +139,9 @@ export function loadConfig(): AppConfig {
             .map((h) => h.trim())
             .filter(Boolean)
         : undefined,
+      trustProxy: int("MCP_TRUST_PROXY", 1),
     },
+    oauth: loadOAuthConfig(),
     ssh: {
       enabled: sshEnabled,
       host: optional("SSH_HOST"),

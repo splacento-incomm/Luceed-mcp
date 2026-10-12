@@ -18,14 +18,16 @@ WORKDIR /app
 ENV NODE_ENV=production \
     MCP_TRANSPORT=http \
     MCP_HTTP_HOST=0.0.0.0 \
-    MCP_HTTP_PORT=8080
+    MCP_HTTP_PORT=8080 \
+    MCP_OAUTH_STATE_FILE=/data/oauth-clients.json
 
 COPY --from=build /app/package.json /app/package-lock.json* ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY scripts/entrypoint.sh /app/scripts/entrypoint.sh
 RUN chmod +x /app/scripts/entrypoint.sh \
-  && chown -R mcp:mcp /app
+  && mkdir -p /data \
+  && chown -R mcp:mcp /app /data
 
 USER mcp
 EXPOSE 8080

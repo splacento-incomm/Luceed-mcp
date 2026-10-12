@@ -15,4 +15,9 @@ services:
     volumes:
       # Place private key at ./secrets/ssh_key (chmod 600) when SSH_ENABLED=true
       - ./secrets:/run/secrets:ro
+      # OAuth client registrations (ChatGPT / Claude)
+      - luceed-mcp-data:/data
     restart: unless-stopped
+
+volumes:
+  luceed-mcp-data:
