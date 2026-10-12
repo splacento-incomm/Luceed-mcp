@@ -31,19 +31,19 @@ This MCP maps the documented GET surface into discoverable tools (`luceed_catalo
 
 ```
 Claude / ChatGPT / Cursor
-        │  HTTPS + Bearer (public URL)
+        │  HTTPS + OAuth (ChatGPT/Claude) or Bearer (Cursor/curl)
         ▼
    TLS reverse proxy (Apache / nginx)
-        │  /mcp-<secret> → 127.0.0.1:8080
+        │  /mcp-<secret> + OAuth routes → 127.0.0.1:8080
         ▼
    Docker (user: luceed-mcp)  ← .env in ~/Luceed-mcp
-        │  optional auto SSH tunnel to Luceed
+        │  optional auto SSH tunnel (bastion private IP → Luceed)
         ▼
    Luceed datasnap/rest  (HTTP Basic, GET only)
 ```
 
-Deploy + proxy + CDN troubleshooting: **[docs/DEPLOY.md](docs/DEPLOY.md)**  
-Connect ChatGPT (**Servers** / Streamable HTTP), Claude, Cursor: **[docs/CONNECT.md](docs/CONNECT.md)**
+Deploy + proxy + CDN + SSH tunnel: **[docs/DEPLOY.md](docs/DEPLOY.md)**  
+Connect ChatGPT (**OAuth** / Streamable HTTP), Claude, Cursor: **[docs/CONNECT.md](docs/CONNECT.md)**
 
 ## Docker image (GHCR)
 
@@ -60,12 +60,13 @@ docker pull ghcr.io/splacento-incomm/luceed-mcp:latest
 ## Production deploy (ChatGPT / Claude)
 
 1. Dedicated OS user `luceed-mcp` + Docker on **`127.0.0.1:8080`**
-2. `.env` with `MCP_HTTP_PATH` (unguessable) + `MCP_AUTH_TOKEN`
-3. **Apache/nginx TLS proxy** for that path (required — clients use public HTTPS)
-4. If the hostname is behind Cloudflare/bot challenge, **disable challenges for the MCP path** or ChatGPT/Claude will get HTML 403s
-5. Optional: `SSH_ENABLED=true` so the container keeps a Luceed tunnel up (no laptop `ssh -L`)
+2. `.env` with `MCP_HTTP_PATH`, `MCP_AUTH_TOKEN`, and **OAuth** (`MCP_PUBLIC_URL`, `MCP_OAUTH_PASSWORD`, `MCP_OAUTH_SECRET`)
+3. **Apache/nginx TLS proxy** for the MCP path **and** OAuth routes (`/.well-known/*`, `/authorize`, `/token`, `/register`, `/oauth/`)
+4. Avoid Cloudflare browser challenges on those paths (or use a DNS-only hostname)
+5. Optional: `SSH_ENABLED=true` — `SSH_HOST` = bastion the MCP host can reach (often private IP); `SSH_REMOTE_HOST` = Luceed as seen from that bastion
 
-Full steps + troubleshooting: **[docs/DEPLOY.md](docs/DEPLOY.md)**
+Full steps + troubleshooting: **[docs/DEPLOY.md](docs/DEPLOY.md)**  
+Client setup: **[docs/CONNECT.md](docs/CONNECT.md)**
 
 ## Install as a Codex plugin
 

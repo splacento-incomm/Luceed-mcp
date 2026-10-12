@@ -32,19 +32,30 @@ Copy `.env.example` → `.env`.
 | `MCP_HTTP_HOST` | `0.0.0.0` | Bind address (HTTP mode) |
 | `MCP_HTTP_PORT` | `8080` | Listen port |
 | `MCP_HTTP_PATH` | `/mcp` | MCP POST path |
-| `MCP_AUTH_TOKEN` | _(empty)_ | **Set this** for remote HTTP |
+| `MCP_AUTH_TOKEN` | _(empty)_ | Bearer / `X-Api-Key` for Cursor, curl |
+
+### OAuth (ChatGPT / Claude web)
+
+| Variable | Default | Notes |
+|----------|---------|--------|
+| `MCP_PUBLIC_URL` | _(empty)_ | Public origin only (`https://mcp.example.com`). **Set this to enable OAuth.** |
+| `MCP_OAUTH_PASSWORD` | | Password on the browser login page |
+| `MCP_OAUTH_SECRET` | | HMAC key, ≥32 chars (`openssl rand -hex 32`) |
+| `MCP_OAUTH_STATE_FILE` | `/data/oauth-clients.json` | DCR client store (Compose volume) |
+| `MCP_TRUST_PROXY` | `1` | Proxy hops in front of Express |
+| `MCP_ALLOWED_HOSTS` | | Comma-separated allowed `Host` headers |
 
 ### SSH tunnel
 
 | Variable | Default | Notes |
 |----------|---------|--------|
 | `SSH_ENABLED` | `false` | Open local forward before serving |
-| `SSH_HOST` | | Bastion / jump host |
+| `SSH_HOST` | | Bastion the **MCP host can SSH to** (often a private IP). Not a Cloudflare hostname. |
 | `SSH_PORT` | `22` | |
 | `SSH_USER` | | SSH user |
-| `SSH_PRIVATE_KEY_PATH` | | Path inside container/host |
+| `SSH_PRIVATE_KEY_PATH` | | Path inside container (`/run/secrets/ssh_key`) |
 | `SSH_PRIVATE_KEY` | | PEM body (use `\n` for newlines) |
-| `SSH_REMOTE_HOST` | `127.0.0.1` | Host as seen **from the bastion** (often Luceed on localhost of bastion) |
+| `SSH_REMOTE_HOST` | `127.0.0.1` | Luceed host **as seen from the bastion** (not the bastion IP unless Luceed is local there) |
 | `SSH_REMOTE_PORT` | `80` | Luceed HTTP port on remote side |
 | `SSH_LOCAL_PORT` | `18080` | Local listen port; must match `LUCEED_BASE_URL` |
 | `SSH_STRICT_HOST_KEY_CHECKING` | `false` | Set `true` in production with known_hosts |
@@ -62,20 +73,28 @@ Copy `.env.example` → `.env`.
 ### Pattern A — MCP opens the tunnel (recommended)
 
 ```
-MCP host  --ssh -L 18080:127.0.0.1:80-->  bastion (whitelisted IP)
-                                            |
-                                         Luceed :80
+MCP host  --ssh -L 18080:luceedapi:3767-->  bastion (private IP / VPN)
+                                              |
+                                           Luceed :3767
 ```
 
 ```env
 SSH_ENABLED=true
-SSH_HOST=bastion.customer.hr
-SSH_USER=tunnel
+SSH_HOST=10.0.0.3
+SSH_USER=deploy
 SSH_PRIVATE_KEY_PATH=/run/secrets/ssh_key
-SSH_REMOTE_HOST=127.0.0.1
-SSH_REMOTE_PORT=80
+SSH_REMOTE_HOST=luceedapi.example.com
+SSH_REMOTE_PORT=3767
 SSH_LOCAL_PORT=18080
 LUCEED_BASE_URL=http://127.0.0.1:18080/datasnap/rest/
+```
+
+Key permissions (container uid **10001**):
+
+```bash
+chmod 755 secrets
+chown 10001:10001 secrets/ssh_key
+chmod 600 secrets/ssh_key
 ```
 
 ### Pattern B — external tunnel / sidecar
@@ -89,17 +108,16 @@ No SSH. Point `LUCEED_BASE_URL` directly at Luceed.
 ## 4. Docker deploy
 
 ```bash
-mkdir -p secrets && chmod 700 secrets
-# put private key at secrets/id_rsa (chmod 600)
+mkdir -p secrets && chmod 755 secrets
+# put private key at secrets/ssh_key (chmod 600, chown 10001:10001)
 cp .env.example .env
-# edit .env
+# edit .env — set MCP_PUBLIC_URL + OAuth for ChatGPT/Claude
 
-# uncomment key volume in docker-compose.yml
 docker compose up --build -d
 docker compose logs -f
 ```
 
-Place a reverse proxy (Caddy/nginx/Traefik) with TLS in front of `:8080` for internet-facing use.
+Place a reverse proxy (Caddy/nginx/Apache) with TLS in front of `:8080` for internet-facing use. Proxy MCP **and** OAuth paths — see [DEPLOY.md](DEPLOY.md).
 
 ### Health
 
@@ -113,11 +131,11 @@ See root `README.md` — `mcpServers` JSON with `command` + `env`.
 
 ### Remote HTTP (Claude / ChatGPT / others)
 
-1. Deploy Docker with `MCP_TRANSPORT=http` and `MCP_AUTH_TOKEN`.
-2. Register custom MCP server URL: `https://your-host/mcp`
-3. Send `Authorization: Bearer <MCP_AUTH_TOKEN>`
+1. Deploy Docker with `MCP_TRANSPORT=http`, `MCP_AUTH_TOKEN`, and OAuth vars (`MCP_PUBLIC_URL`, …).
+2. Register custom MCP server URL: `https://your-host/mcp-<secret>` (**Streamable HTTP**).
+3. ChatGPT / Claude web: **OAuth** + login password. Cursor / curl: Bearer header.
 
-Exact UI steps vary by product; the transport is **Streamable HTTP** (MCP 2025-era).
+Exact UI steps: [CONNECT.md](CONNECT.md).
 
 ## 6. Full coverage model
 
@@ -143,11 +161,13 @@ Magento `Debuglabs/Luceed` write calls (`partneri/snimi`, `NaloziProdaje/snimi`)
 | Symptom | Check |
 |---------|--------|
 | `Missing required environment variable` | `.env` / Compose `env_file` |
-| `SSH tunnel did not open local port` | Key perms (`600`), bastion, `SSH_REMOTE_*` |
+| `SSH tunnel did not open local port` | Key perms (uid 10001), bastion reachability, `SSH_HOST` vs `SSH_REMOTE_HOST` |
+| `SSH private key not found` in container | `secrets/` not traversable / wrong owner |
 | HTTP 401 from Luceed | Username/password; WS user enabled |
-| HTTP 403 / timeout | IP whitelist / tunnel |
+| HTTP 403 / timeout | IP whitelist / tunnel / wrong remote host |
 | Empty sales | Wrong `pj_uid` or dates |
-| MCP client 401 | `MCP_AUTH_TOKEN` |
+| MCP client 401 | Bearer token or complete OAuth |
+| ChatGPT Invalid oauth data | Redeploy with `iss` support; re-add connector |
 | Unknown action | `luceed_catalog` for that resource |
 
 ## 9. Extending
