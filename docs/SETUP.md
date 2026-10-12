@@ -153,8 +153,9 @@ Magento `Debuglabs/Luceed` write calls (`partneri/snimi`, `NaloziProdaje/snimi`)
 
 1. `luceed_ping`
 2. `luceed_catalog` with `magento_only: true`
-3. `luceed_list_warehouses` → use `luceed_skladista` / `action=lista` — note `pj_uid`
-4. `luceed_retail_sales_summary` with that `pj_uid`
+3. `luceed_recent_sales_orders` with `limit: 40` — **use this for “last N orders”** (Luceed raw `statusi` is unsorted)
+4. `luceed_skladista` / `action=lista` — note `pj_uid`
+5. `luceed_retail_sales_summary` with that `pj_uid`
 
 ## 8. Troubleshooting
 

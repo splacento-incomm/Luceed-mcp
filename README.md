@@ -129,6 +129,7 @@ npm run start:stdio
 | `luceed_catalog` | List all resources/actions/paths |
 | `luceed_ping` | Auth / connectivity check |
 | `luceed_<resource>` | One tool per resource; pass `action` + params |
+| `luceed_recent_sales_orders` | **Preferred** for “last N sales orders” (sorted newest-first) |
 | `luceed_retail_sales_summary` | Sales totals by payment type |
 | `luceed_retail_sales_by_product` | Sales by product |
 | `luceed_get` | Raw relative GET escape hatch |

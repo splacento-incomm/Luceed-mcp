@@ -890,12 +890,17 @@ export const CATALOG: ResourceDef[] = [
   {
     id: "nalozi_prodaje",
     title: "Sales orders (nalozi prodaje)",
-    description: "B2B / wholesale sales orders — heavily used by Magento sync.",
+    description:
+      "B2B / wholesale sales orders — heavily used by Magento sync. " +
+      "IMPORTANT: Luceed does NOT sort or paginate. For 'latest N orders' prefer tool luceed_recent_sales_orders " +
+      "(it sorts by date/number). Raw statusi results are unsorted and require a status filter.",
     actions: [
       {
         action: "statusi",
         path: "NaloziProdaje/statusi/{statusi}/{od_datuma?}/{do_datuma?}",
-        description: "List by status code(s) + optional dates",
+        description:
+          "List by status code(s) + optional dates. Response is UNSORTED — do not treat array order as newest-first. " +
+          "Prefer luceed_recent_sales_orders for latest-N queries.",
         params: [
           p("statusi", "Status codes comma-separated", { list: true }),
           opt("od_datuma", "From date"),

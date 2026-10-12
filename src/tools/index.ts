@@ -6,6 +6,22 @@ import type { LuceedClient } from "../luceed/client.js";
 import { joinPath, toLuceedDate } from "../luceed/client.js";
 import { errorResult, getUnwrapped, textResult } from "./helpers.js";
 
+/** Parse Luceed `d.M.yyyy` (optional trailing `.`) to epoch ms for sorting. */
+function parseLuceedDay(value: string): number {
+  const m = value.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (!m) return 0;
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime();
+}
+
+function formatLuceedDay(d: Date): string {
+  return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+}
+
+/** Turn YYYY-MM-DD or D.M.YYYY into a Date at local midnight. */
+function toLuceedDateParts(input: string): Date {
+  return new Date(toLuceedDate(input).split(".").reverse().join("-"));
+}
+
 function zodForResource(actions: { action: string; params?: { name: string; description: string; required?: boolean }[] }[]) {
   const actionEnum = actions.map((a) => a.action) as [string, ...string[]];
 
@@ -132,6 +148,140 @@ export function registerTools(server: McpServer, client: LuceedClient): void {
   }
 
   // ── Convenience analytics (aliases with nicer summaries) ────────────────
+
+  server.registerTool(
+    "luceed_recent_sales_orders",
+    {
+      description:
+        "PREFERRED for 'last N sales orders / nalozi prodaje'. " +
+        "Fetches NaloziProdaje by status + date window, dedupes, sorts newest-first " +
+        "(datum then broj), and returns only `limit` rows. " +
+        "Do NOT use raw luceed_nalozi_prodaje statusi for this — Luceed returns unsorted batches " +
+        "and a single status can miss other recent orders.",
+      inputSchema: {
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("How many newest orders to return (default 40)"),
+        days: z
+          .number()
+          .int()
+          .min(1)
+          .max(90)
+          .optional()
+          .describe("Look-back window in days ending today (default 14)"),
+        statuses: z
+          .string()
+          .optional()
+          .describe(
+            "Comma-separated Luceed status codes (default 10,99,05). " +
+              "Status 10 = typical open webshop/B2B; 99 often canceled; 05 often complete-ish.",
+          ),
+        from_date: z
+          .string()
+          .optional()
+          .describe("Override window start (YYYY-MM-DD or D.M.YYYY)"),
+        to_date: z
+          .string()
+          .optional()
+          .describe("Override window end (default today)"),
+      },
+    },
+    async ({ limit, days, statuses, from_date, to_date }) => {
+      try {
+        const take = limit ?? 40;
+        const lookback = days ?? 14;
+        const statusList = (statuses ?? "10,99,05")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (statusList.length === 0) {
+          throw new Error("statuses must list at least one code");
+        }
+
+        const end = to_date ? new Date(toLuceedDateParts(to_date)) : new Date();
+        const start = from_date
+          ? new Date(toLuceedDateParts(from_date))
+          : new Date(end.getTime() - (lookback - 1) * 86_400_000);
+
+        const fromLuceed = formatLuceedDay(start);
+        const toLuceed = formatLuceedDay(end);
+        const path = joinPath(
+          "NaloziProdaje",
+          "statusi",
+          `[${statusList.join(",")}]`,
+          fromLuceed,
+          toLuceed,
+        );
+        const result = await getUnwrapped(client, path);
+        const rows = Array.isArray(result.data) ? result.data : [];
+
+        const byUid = new Map<string, Record<string, unknown>>();
+        for (const row of rows) {
+          if (!row || typeof row !== "object") continue;
+          const r = row as Record<string, unknown>;
+          const uid = String(r.nalog_prodaje_uid ?? r.uid ?? "");
+          const key = uid || `${r.broj}-${r.datum}-${r.partner}`;
+          byUid.set(key, r);
+        }
+
+        const sorted = [...byUid.values()].sort((a, b) => {
+          const da = parseLuceedDay(String(a.datum ?? ""));
+          const db = parseLuceedDay(String(b.datum ?? ""));
+          if (da !== db) return db - da;
+          const ba = Number(a.broj ?? 0);
+          const bb = Number(b.broj ?? 0);
+          if (ba !== bb) return bb - ba;
+          return String(b.nalog_prodaje_uid ?? "").localeCompare(
+            String(a.nalog_prodaje_uid ?? ""),
+          );
+        });
+
+        const top = sorted.slice(0, take).map((r, i) => ({
+          rank: i + 1,
+          nalog_prodaje_uid: r.nalog_prodaje_uid ?? null,
+          broj: r.broj ?? null,
+          datum: r.datum ?? null,
+          status: r.status ?? null,
+          narudzba: r.narudzba ?? r.nalog_prodaje_b2b ?? null,
+          partner: r.partner ?? null,
+          partner_uid: r.partner_uid ?? null,
+          za_naplatu: r.za_naplatu ?? null,
+          valuta: r.valuta ?? null,
+          skladiste: r.skladiste ?? null,
+        }));
+
+        const byDate: Record<string, number> = {};
+        for (const r of sorted) {
+          const d = String(r.datum ?? "?");
+          byDate[d] = (byDate[d] ?? 0) + 1;
+        }
+
+        return textResult({
+          ok: true,
+          limit: take,
+          statuses: statusList,
+          from_date: fromLuceed,
+          to_date: toLuceed,
+          fetched: rows.length,
+          unique: sorted.length,
+          returned: top.length,
+          newest_datum: top[0]?.datum ?? null,
+          oldest_in_result: top[top.length - 1]?.datum ?? null,
+          counts_by_datum: byDate,
+          note:
+            "Sorted newest-first by Luceed datum then broj. " +
+            "Widen statuses/days if you expect more recent rows.",
+          orders: top,
+        });
+      } catch (err) {
+        return errorResult(err);
+      }
+    },
+  );
 
   server.registerTool(
     "luceed_retail_sales_summary",
