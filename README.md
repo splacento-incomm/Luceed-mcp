@@ -31,13 +31,19 @@ This MCP maps the documented GET surface into discoverable tools (`luceed_catalo
 
 ```
 Claude / ChatGPT / Cursor
-        │  MCP (Streamable HTTP or stdio)
+        │  HTTPS + Bearer (public URL)
+        ▼
+   TLS reverse proxy (Apache / nginx)
+        │  /mcp-<secret> → 127.0.0.1:8080
         ▼
    Docker (user: luceed-mcp)  ← .env in ~/Luceed-mcp
-        │  127.0.0.1:8080 + optional SSH tunnel
+        │  optional auto SSH tunnel to Luceed
         ▼
    Luceed datasnap/rest  (HTTP Basic, GET only)
 ```
+
+Deploy + proxy + CDN troubleshooting: **[docs/DEPLOY.md](docs/DEPLOY.md)**  
+Connect ChatGPT / Claude: **[docs/CONNECT.md](docs/CONNECT.md)**
 
 ## Docker image (GHCR)
 
@@ -51,35 +57,15 @@ ghcr.io/splacento-incomm/luceed-mcp:latest
 docker pull ghcr.io/splacento-incomm/luceed-mcp:latest
 ```
 
-## Production deploy (dedicated user)
+## Production deploy (ChatGPT / Claude)
 
-**Do not run as root.** Use a dedicated OS user with a home directory; keep `.env` only there; bind Docker to localhost; reverse-proxy an unguessable path over TLS.
+1. Dedicated OS user `luceed-mcp` + Docker on **`127.0.0.1:8080`**
+2. `.env` with `MCP_HTTP_PATH` (unguessable) + `MCP_AUTH_TOKEN`
+3. **Apache/nginx TLS proxy** for that path (required — clients use public HTTPS)
+4. If the hostname is behind Cloudflare/bot challenge, **disable challenges for the MCP path** or ChatGPT/Claude will get HTML 403s
+5. Optional: `SSH_ENABLED=true` so the container keeps a Luceed tunnel up (no laptop `ssh -L`)
 
-Full steps: **[docs/DEPLOY.md](docs/DEPLOY.md)**
-
-Short version (as root once):
-
-```bash
-adduser --disabled-password --gecos "Luceed MCP" luceed-mcp
-# install Docker, then:
-usermod -aG docker luceed-mcp
-
-sudo -u luceed-mcp -H bash -lc '
-  cd ~ && git clone https://github.com/splacento-incomm/Luceed-mcp.git
-  cd Luceed-mcp && mkdir -p secrets && chmod 700 secrets
-  cp .env.example .env && chmod 600 .env
-  # edit .env — LUCEED_*, MCP_HTTP_PATH, MCP_AUTH_TOKEN
-  docker compose pull || docker compose build
-  docker compose up -d
-'
-```
-
-Compose reads `/home/luceed-mcp/Luceed-mcp/.env` and listens on **`127.0.0.1:8080` only**.
-
-Point Claude / ChatGPT at:
-
-`https://your-domain/mcp-<secret-from-env>`  
-`Authorization: Bearer <MCP_AUTH_TOKEN>`
+Full steps + troubleshooting: **[docs/DEPLOY.md](docs/DEPLOY.md)**
 
 ## Quick start (local / stdio)
 

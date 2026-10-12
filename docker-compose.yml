@@ -12,7 +12,7 @@ services:
       MCP_TRANSPORT: http
       MCP_HTTP_HOST: 0.0.0.0
       MCP_HTTP_PORT: "8080"
-    # Optional: mount ./secrets/ssh_key when SSH_ENABLED=true
-    # volumes:
-    #   - ./secrets:/run/secrets:ro
+    volumes:
+      # Place private key at ./secrets/ssh_key (chmod 600) when SSH_ENABLED=true
+      - ./secrets:/run/secrets:ro
     restart: unless-stopped
