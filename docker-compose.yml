@@ -12,7 +12,7 @@ services:
       MCP_TRANSPORT: http
       MCP_HTTP_HOST: 0.0.0.0
       MCP_HTTP_PORT: "8080"
-    volumes:
-      # Optional SSH key for Luceed IP whitelist tunnel (see SSH_* in .env)
-      - ./secrets:/run/secrets:ro
+    # Optional: mount ./secrets/ssh_key when SSH_ENABLED=true
+    # volumes:
+    #   - ./secrets:/run/secrets:ro
     restart: unless-stopped

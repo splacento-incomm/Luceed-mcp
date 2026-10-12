@@ -77,14 +77,15 @@ export function loadConfig(): AppConfig {
   const privateKeyPath = optional("SSH_PRIVATE_KEY_PATH");
   const privateKey = optional("SSH_PRIVATE_KEY");
 
-  if (sshEnabled && !privateKeyPath && !privateKey) {
-    throw new Error(
-      "SSH_ENABLED=true requires SSH_PRIVATE_KEY_PATH or SSH_PRIVATE_KEY",
-    );
-  }
-
-  if (privateKeyPath && !existsSync(resolve(privateKeyPath))) {
-    throw new Error(`SSH private key not found at: ${privateKeyPath}`);
+  if (sshEnabled) {
+    if (!privateKeyPath && !privateKey) {
+      throw new Error(
+        "SSH_ENABLED=true requires SSH_PRIVATE_KEY_PATH or SSH_PRIVATE_KEY",
+      );
+    }
+    if (privateKeyPath && !existsSync(resolve(privateKeyPath))) {
+      throw new Error(`SSH private key not found at: ${privateKeyPath}`);
+    }
   }
 
   const transport = (optional("MCP_TRANSPORT", "stdio").toLowerCase() ||
