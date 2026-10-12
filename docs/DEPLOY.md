@@ -45,7 +45,7 @@ Edit `.env`:
 |----------|---------|
 | `LUCEED_BASE_URL` / `USERNAME` / `PASSWORD` | Luceed API |
 | `MCP_HTTP_PATH` | Unguessable path, e.g. `/mcp-<64 hex chars>` |
-| `MCP_AUTH_TOKEN` | Bearer secret for Claude/ChatGPT |
+| `MCP_AUTH_TOKEN` | Bearer / `X-Api-Key` secret (Claude, curl, Cursor; ChatGPT UI has no Bearer field — see [CONNECT.md](CONNECT.md)) |
 | `MCP_ALLOWED_HOSTS` | Your public hostname(s), comma-separated |
 | `SSH_*` | Auto tunnel if Luceed is IP-whitelisted (see below) |
 

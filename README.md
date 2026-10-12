@@ -43,7 +43,7 @@ Claude / ChatGPT / Cursor
 ```
 
 Deploy + proxy + CDN troubleshooting: **[docs/DEPLOY.md](docs/DEPLOY.md)**  
-Connect ChatGPT / Claude: **[docs/CONNECT.md](docs/CONNECT.md)**
+Connect ChatGPT (**Servers** / Streamable HTTP), Claude, Cursor: **[docs/CONNECT.md](docs/CONNECT.md)**
 
 ## Docker image (GHCR)
 
@@ -66,6 +66,31 @@ docker pull ghcr.io/splacento-incomm/luceed-mcp:latest
 5. Optional: `SSH_ENABLED=true` so the container keeps a Luceed tunnel up (no laptop `ssh -L`)
 
 Full steps + troubleshooting: **[docs/DEPLOY.md](docs/DEPLOY.md)**
+
+## Install as a Codex plugin
+
+For Codex Desktop, use the bundled installer instead of manually adding an MCP
+server in Settings. It creates a real **Luceed** plugin entry, with your
+deployment URL stored only in your local plugin configuration:
+
+```bash
+npm run install:codex-plugin -- --url https://mcp.example.com/mcp-your-secret
+```
+
+If your deployment requires the optional Bearer token, configure it in your
+desktop environment first, then tell the installer which environment variable
+to use:
+
+```bash
+export LUCEED_MCP_AUTH_TOKEN='your-token'
+npm run install:codex-plugin -- \
+  --url https://mcp.example.com/mcp-your-secret \
+  --token-env LUCEED_MCP_AUTH_TOKEN
+```
+
+Restart Codex, open **Plugins → Browse directory → Personal**, install
+**Luceed**, and start a new task. Full details are in
+[docs/CODEX.md](docs/CODEX.md).
 
 ## Quick start (local / stdio)
 
